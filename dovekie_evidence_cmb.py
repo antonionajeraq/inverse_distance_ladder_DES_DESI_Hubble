@@ -99,7 +99,9 @@ COV_CMB = 1.0e-9 * np.array([[53.84815397, 1.1072339, -28.70053592],
                              [-28.70053592, -17.60162507, 843.13219472]])
 CINV_CMB = np.linalg.inv(COV_CMB)
 
-# BBN, Astrophys. Space Sci. (2026) 371:20
+# BBN: Giovanetti et al. (2025), PRD 112, 063530 (arXiv:2408.14531), Table 1, BBN only,
+# marginalised over nuclear rates, PRIMAT, fixed N_eff: 100 omega_b = 2.191 +0.022 -0.021,
+# symmetrised to 2.1915 +- 0.0215.
 USE_BBN = os.environ.get('USE_BBN', '1').lower() not in ('0', 'false', 'no')
 WB_BBN, SIG_WB_BBN = 0.021915, 0.000215
 

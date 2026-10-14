@@ -1,0 +1,12 @@
+# Pinned loosely: the analysis is not sensitive to patch versions, and the exact
+# versions that produced the shipped chains are recorded in every chains/*.npz manifest
+# under "packages".  Check there, not here, if a number moves.
+numpy>=1.24
+scipy>=1.10
+jax>=0.4.26
+numpyro>=0.13
+dynesty>=2.1
+matplotlib>=3.7
+# make_triangles.py needs this and it was missing: `pip install -r requirements.txt`
+# followed by `python make_triangles.py` failed on a clean environment.
+getdist>=1.4

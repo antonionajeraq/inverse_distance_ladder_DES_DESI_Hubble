@@ -1,0 +1,17 @@
+# Shared figure settings for the Dovekie IDL floats.  See CLAUDE_fig_cost.md, section 3
+# ("Settings to apply once").  matplotlib reads this file automatically when a script is
+# run from this directory, so nothing has to be remembered in the plotting code.
+#
+# savefig.dpi   -- NOT figure.dpi.  It defaults to the string 'figure', which inherits
+#                  figure.dpi = 100: far too low for a rasterised layer.  In PDF output
+#                  dpi has no effect on vector paths, text or markers, so raising it
+#                  cannot degrade anything -- it sets the resolution of rasterised
+#                  artists and nothing else.  NOTE: a savefig(dpi=...) argument in the
+#                  script still wins over this (precedence: matplotlibrc -> rcParams ->
+#                  the savefig argument), so a figure that gains rasterized=True must
+#                  also drop its explicit dpi= or raise it here.
+# pdf.fonttype  -- 42 embeds subsetted TrueType instead of Type 3.  MNRAS and arXiv both
+#                  object to Type 3.  No visual change; files grow slightly.
+savefig.dpi:   600
+pdf.fonttype:  42
+ps.fonttype:   42

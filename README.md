@@ -7,8 +7,9 @@ Code, chains and mock ensembles for
 > J. A. Nájera, I. Banik and H. Desmond (MNRAS, in preparation)
 
 The figures exactly as they appear in the paper are already in `results/` and
-`results_mock/`. Every figure and table can be rebuilt from this repository in about seven
-minutes on one core, with no sampler or cluster:
+`results_mock/`. Every figure and table can be rebuilt from this repository on one core, with no sampler
+or cluster (about 7 minutes on the authors' machine; 12 minutes of CPU and 40 minutes of
+wall time on a cluster node with a networked filesystem):
 
 ```bash
 pip install -r requirements.txt
@@ -73,7 +74,7 @@ strokecheck.py            vector-stroke budget check on every saved figure
 Bernstein_E_prior.py      used only by test_repo.py, as an independent check of the
                           envelope-prior volume
 
-test_repo.py              46 acceptance tests, ~20 s
+test_repo.py              48 acceptance tests, ~20 s
 reproduce.sh              renders the whole paper from the shipped cache
 matplotlibrc              figure style (Type 42 fonts)
 
@@ -166,7 +167,7 @@ accepted.
 | `chains/deltaorder` | `python dovekie_cosmography.py --task deltaorder` (see below) | 9 | 16 h |
 | `chains/bic` | `python dovekie_cosmography.py --task bic --check-box`, then `python ls_delta_order.py` and `python make_bic_order.py` | 9 | 4 h in total (least squares, no sampler) |
 | `chains/evorder` | `python evidence_order.py` | 25 | 24 h (dynesty, 1 core) |
-| `chains/evidence_cmb` | `SAMPLER=rslice python dovekie_evidence_cmb.py --task grid`, then the same with `Z1_PRIOR=log` | 27 + 9 | 12 h (dynesty, 1 core) |
+| `chains/evidence_cmb` | `SAMPLER=rslice BOOTSTRAP=0 python dovekie_evidence_cmb.py --task grid`, then the same with `Z1_PRIOR=log` | 27 + 9 | 12 h (dynesty, 1 core) |
 
 The second `evidence_cmb` pass samples only the nine `exp` cells with a log-uniform z_1
 prior (Table 4). Every other cell is already cached under the same name.
@@ -242,8 +243,9 @@ NUTS uses a steep smooth wall instead.
   target acceptance 0.8. Chains start at flat ΛCDM (Ω_m = 0.315, H0 = 68).
 - A chain reaches a table only if R̂ ≤ 1.02 and n_eff ≥ 400. Divergences are recorded but
   do not fail a chain. `ALLOW_BAD_CHAINS=1` overrides the gate.
-- dynesty: Δln Z = 0.01, with 800 live points for the model comparison (Tables 3 and 4)
-  and 1000 for the order sweep (`evidence_order.py`).
+- dynesty, with the `rslice` sampler throughout: Δln Z = 0.01 and 800 live points for the
+  model comparison (Tables 3 and 4, run with `BOOTSTRAP=0`), and Δln Z = 0.1 and 1000 live
+  points for the order sweep (`evidence_order.py`).
 
 JAX runs in float32, as for the published numbers. The covariance factorisations are done in
 float64 by numpy.

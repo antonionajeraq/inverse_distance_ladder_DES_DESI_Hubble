@@ -1,6 +1,7 @@
 #!/bin/bash
 # Render every figure and table of the paper from the shipped chains and mock ensembles.
-# Nothing here samples.  About 7 minutes on one core, plus a ~6 MB download of the inputs.
+# Nothing here samples.  About 7-15 minutes of CPU on one core, plus a ~6 MB download of the
+# inputs; wall time can be much longer on a networked filesystem.
 #
 #   bash reproduce.sh                # uses `python` on your PATH
 #   PYTHON=/path/to/python bash reproduce.sh

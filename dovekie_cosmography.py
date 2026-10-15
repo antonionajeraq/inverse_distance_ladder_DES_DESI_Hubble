@@ -12,19 +12,21 @@ a manifest of the settings that produced it.
 
 WHAT IT COMPUTES  (--task, and where each lands in the manuscript)
 
-  ladder      Table 1.  H0, r_d, M_des, q0 and chi2/dof for
+  ladder      Table 2.  H0, r_d, M_des, q0 and chi2/dof for
               {config A, config B} x {DES, DES+legacy} x {cosmography P=4, flat LCDM}.
-  floorsweep  Figure 2.  The same ladder with a rising redshift floor: only the DATA
+  floorsweep  Figure 5.  The same ladder with a rising redshift floor: only the DATA
               change, the estimator does not.
-  bic         The order-selection protocol.  BIC(P) = chi2_min(P) + k ln N on the
-              UNCONSTRAINED chi2 minimum, so the order decision carries no prior.
-  legacy      Table 3 and Figure 3.  The four-rung Delta ladder (prior-free least
+  bic         The prior-free chi2 minimum at each order P (the least-squares columns of
+              Tables B1 and B2).  The order itself is chosen by the Bayesian evidence
+              (evidence_order.py, Appendix B).
+  legacy      Table 5 and Figures 6-8.  The four-rung Delta ladder (prior-free least
               squares) and the legacy zero-point sampled jointly with the cosmology.
-  ap          Table 4 and Figure 4.  The Alcock-Paczynski consistency test: predict the
+  ap          Table A1 and Figure A1.  The Alcock-Paczynski consistency test: predict the
               DESI F_AP = D_M/D_H from the SN shape alone, with no r_d and no calibration.
 
-  The Bayesian model comparison of Table 2 lives in `dovekie_evidence.py`, which imports
-  this module for its data and likelihood blocks so there is one definition of each.
+  The Bayesian model comparison of Tables 3 and 4 lives in `dovekie_evidence_cmb.py` (with
+  the models and anchors in `dovekie_evidence.py`), which imports this module for its data
+  and likelihood blocks so there is one definition of each.
 
 THE MODEL
 
@@ -83,7 +85,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 BASELINE = dict(
     # ---- expansion ---------------------------------------------------------
-    P=4,                    # polynomial order.  Selected by BIC; see --task bic.
+    P=4,                    # polynomial order: the highest Bayesian evidence for DES
+                            # (evidence_order.py, Appendix B).
     NGRID=800,              # points in the z-grid carrying the trapezoid D_C integral.
                             # 400 doubled the low-z integration error once the grid was
                             # stretched to z=2.33 by the Lyman-alpha BAO point.
@@ -846,10 +849,9 @@ def cc_block():
 # =============================================================================
 # 5.  The cosmography <-> coefficient map
 # =============================================================================
-# The prior is stated on (H0, q0, j0, s0, l0) and imposed on the c_k, so the map between
-# them has to be exact and has to be in this file: the per-coefficient half-widths quoted
-# in the paper are a DERIVED quantity, and `--task bic --check-box` recomputes them here
-# rather than trusting the numbers in BASELINE.
+# The prior is the envelope prior of section 7, stated on E; it does not use this map.
+# The map survives for the diagnostics that work in the cosmographic parameters
+# (`--task bic --check-box`, cg_box) and for the 'cosmo' mock fiducial (mock_idl.py).
 #
 # Everything is truncated power-series arithmetic, coefficients lowest order first.
 
@@ -861,8 +863,8 @@ def cg_box(P):
     """[(lo, hi)] for the first P cosmographic parameters.
 
     🚨 NOT A PRIOR ANY MORE.  Until 2026-09-28 the coefficient prior was pushed forward
-    from this box; it is now the Bernstein prior of section 7.  The box survives only for
-    the chart diagnostics (ls_cosmography.py, make_cg_figure.py).
+    from this box; it is now the envelope prior of section 7.  The box survives only for
+    the chart diagnostics, whose scripts are not part of this repository.
 
     q0/j0/s0/l0 in [-10, +9] -- width 19, centred on the standard -0.5.  m0 and n0 are
     that interval widened x5 and x20, and the widening is not cosmetic: flat LCDM itself
@@ -2032,7 +2034,7 @@ def minimise_chi2(sample, config, background, P=None, theta0=None, quiet=True,
 
 
 # =============================================================================
-# 11.  --task ladder   (Table 1)
+# 11.  --task ladder   (Table 2)
 # =============================================================================
 
 # Array sharding.  Every cell-looping task filters through this ONE helper, so a slurm
@@ -2154,7 +2156,7 @@ def _print_ladder(rows):
 
 
 # =============================================================================
-# 12.  --task floorsweep   (Figure 2)
+# 12.  --task floorsweep   (Figure 5)
 # =============================================================================
 # Only the DATA change: SNe below z_floor are dropped and the sample is refitted with the
 # identical estimator.  A monotonic dH0/dz_floor would mean the lowest-z supernovae carry
@@ -2233,7 +2235,7 @@ def task_floorsweep(recompute=False, quiet=True):
 
 
 # =============================================================================
-# 13.  --task bic   (order selection)
+# 13.  --task bic   (least-squares order sweep, Tables B1 and B2)
 # =============================================================================
 def task_bic(plist=(2, 3, 4, 5, 6, 7, 8, 9, 10), recompute=False, check_box=False):
     """BIC(P) = chi2_min(P) + k ln N,  k = (P+1) + 2,  minimised over P.
@@ -2363,7 +2365,7 @@ def _print_box_check(out, used=(2, 3, 4, 5, 6)):
 
 
 # =============================================================================
-# 14.  --task legacy   (Table 3, Figure 3)
+# 14.  --task legacy   (Table 5, Figures 6-8)
 # =============================================================================
 # Two questions, and they need different machinery.
 #
@@ -2498,6 +2500,9 @@ def fit_des_shape(shape, P=None):
         return r_sn(th) if ex is None else np.concatenate([r_sn(th), ex])
 
     sol = least_squares(r_all, theta0, method='lm', max_nfev=20000)
+    if not sol.success or not np.all(np.isfinite(sol.x)):
+        raise RuntimeError('fit_des_shape(%r, P=%r) did not converge: %s'
+                           % (shape, P, sol.message))
     # Jacobians built with OUR differencing, not least_squares' internal one: mixing the
     # two breaks the M_eff <-> P_sn identity asserted below.
     J = _fd_jac(lambda th: _rung_m(shape, th, b['z_des'], b['zhel_des'], zgrid, P),
@@ -2713,7 +2718,7 @@ def task_legacy(recompute=False, quiet=True):
 
 
 # =============================================================================
-# 15.  --task ap   (Table 4, Figure 4)
+# 15.  --task ap   (Table A1, Figure A1)
 # =============================================================================
 # The consistency test.  Using the supernovae ALONE, predict the F_AP = D_M/D_H that DESI
 # measures at its three in-range redshifts, assuming only that the SN distance-redshift
@@ -2865,8 +2870,8 @@ def fap_lcdm(z, Om=0.3175):
 #
 # TWO questions, one grid, because they share every cell:
 #
-#   (a) ORDER.  The published legacy result (H0 = 71.19 +- 1.96 with the zero point
-#       sampled, against 68.02 +- 0.70 with it held at face value) is quoted at P = 4.
+#   (a) ORDER.  The published legacy result (H0 = 71.03 +- 1.99 with the zero point
+#       sampled, against 67.98 +- 0.69 with it held at face value) is quoted at P = 4.
 #       P = 4 is the BIC minimum for des_only, but for `full` the BIC minimum is P = 5,
 #       with P = 4 behind by only 1.79 -- inside the |dBIC| < 2 band.  The prior-free
 #       chi2 minimum with Delta free reads 71.14 at P = 4 and 68.61 at P = 5, and 68.6

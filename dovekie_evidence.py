@@ -1,5 +1,8 @@
 """
-dovekie_evidence.py -- the Bayesian model comparison of Table 2.
+dovekie_evidence.py -- the Bayesian model comparison WITHOUT the CMB (Planck r_d prior).
+
+This CMB-free table is not in the paper.  Its models, anchors and likelihood blocks are
+re-used unchanged by dovekie_evidence_cmb.py, which produces the paper's Tables 3 and 4.
 
 Is a late-time solution to the Hubble tension preferred over LCDM, given the DES-Dovekie
 supernovae, DESI DR2 BAO, the cosmic chronometers and a Planck sound horizon?
@@ -45,7 +48,7 @@ USAGE
     python dovekie_evidence.py --task grid          # run every cell, caching as it goes
     python dovekie_evidence.py --task grid --only des_only/lfree3/exp
     python dovekie_evidence.py --task grid --nproc 8   # spread loglike calls over 8 cores
-    python dovekie_evidence.py --task table         # render Table 2 from the cache
+    python dovekie_evidence.py --task table         # render the CMB-free table from the cache
 
   Each cell caches its dynesty run under chains/evidence/.  With the shipped cache the
   table renders in seconds and no sampling happens.

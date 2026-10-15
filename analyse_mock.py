@@ -267,8 +267,8 @@ def figure(obs, noiseless, ens, pub, out='floorsweep_mock'):
     Everything drawn as a line comes from ONE estimator -- the prior-free chi2 minimum --
     so the observed sweep and the mock band are directly comparable.  The published NUTS
     posterior means are overplotted as crosses; they agree with the least-squares curve to
-    a median 0.12 km/s/Mpc and separate only at z_floor >= 0.26, where the coefficient box
-    starts to bind (analyse_mock prints the comparison).
+    a median 0.62 km/s/Mpc and separate by more than 2 km/s/Mpc only at z_floor >= 0.22,
+    where few SNe remain and the least-squares fit has no H0 prior (NUTS uses U(50, 90)).
 
     DES and DES+legacy are the SAME FIT above z_floor = 0.087, where no legacy supernova
     survives the cut, so the black curve runs underneath the red one over half the axis.
@@ -367,7 +367,7 @@ def figure(obs, noiseless, ens, pub, out='floorsweep_mock'):
                  'SPA values\n'
                  '$H_0 = 67.19$, $\\Omega_{\\rm m} = 0.3175$, $r_{\\rm d} = 147.05$ cMpc, '
                  '$M = -19.40$, $\\Delta M_\\mathrm{legacy} = 0$ '
-                 '-- same code, same covariances, same priors, only the data replaced',
+                 '-- same code, same covariances, only the data replaced',
                  fontsize=11.5)
     fig.tight_layout(rect=(0, 0.075, 1, 0.94))
     os.makedirs(RES, exist_ok=True)

@@ -42,17 +42,17 @@ ONE-SIDED LIMITS -- WHEN THE TWO-SIDED INTERVAL IS NOT DEFINED
   So every interval gets a second stage.  Let [x_min, x_max] be the region the samples
   actually cover (below).  Then:
 
-    lower crossing < x_min  ->  all the mass below the upper crossing is inside the 68.27%
-                                HPD region, so P(x < High_CL) = 68.27% exactly, and the
-                                result is reported as `x < High_CL` at 1 sigma.
-    upper crossing > x_max  ->  symmetrically, `x > Low_CL`.
+    lower crossing < x_min  ->  the result is reported as the one-sided limit `x < v` at
+                                1 sigma, with v the weighted 68.27% quantile, so that
+                                P(x < v) = 68.27%.
+    upper crossing > x_max  ->  symmetrically, `x > v` with v the 31.73% quantile.
     both                    ->  the contour clears the samples at both ends; there is no
                                 limit of either sign, and the entry is flagged rather than
                                 quoted.
 
-  The limit value is the SAME contour crossing the two-sided branch would have reported --
-  nothing is re-solved, only re-interpreted -- so a parameter that drifts across the test
-  from one run to the next does not jump in value.
+  The limit is a quantile rather than the contour crossing because the smoothing leaks
+  density across a hard prior wall, so near a wall the crossing encloses more than 68.27%
+  of the samples (see the driver).
 
   `x_min`/`x_max` are weight-aware.  For the NUTS chains (unit weights) they are exactly
   min(x) and max(x), which is the literal reading.  For the dynesty cells they cannot be:
@@ -691,9 +691,9 @@ def analyse_chain(path, group, plot=False):
              '# limits  : a row reading `< v` or `> v` is ONE-SIDED: the opposite contour',
              '#           crossing fell outside the range the samples cover, so it bounds',
              '#           nothing and the two-sided interval is not defined.  Read it as',
-             '#           P(x < v) = %.2f%% (or P(x > v) = %.2f%%).  `v` is the same contour'
+             '#           P(x < v) = %.2f%% (or P(x > v) = %.2f%%).  `v` is the weighted'
              % (100.0 * P_threshold, 100.0 * P_threshold),
-             '#           crossing the two-sided row would have printed, not a re-fit.',
+             '#           quantile of the samples at that probability.',
              '#',
              '# kl      : KL(posterior || prior) in nats; 0 means the posterior IS the',
              '#           prior.  s/sp is sigma_post/sigma_prior.  The prior is the box',
@@ -741,30 +741,35 @@ def analyse_chain(path, group, plot=False):
         # number.  See ONE-SIDED LIMITS in the module docstring.
         x_min, x_max = effective_support(v, wv)
         limit = classify_limit(lo, hi, x_min, x_max)
-        limit_value = {'upper': hi, 'lower': lo}.get(limit)
-        # The weighted mass the limit actually encloses, measured on the SAMPLES rather
-        # than on the smoothed grid the contour was solved on.  These differ, and for a
-        # posterior against a hard wall they differ visibly: the sigma/5 smoothing spreads
-        # density across the wall into bins holding no samples, that leaked mass counts
-        # towards the 68.27% inside the contour, and the limit therefore sits further out
-        # than a plain quantile would put it.  It is reported, not corrected: the crossing
-        # is what was asked for, and the same leak is in the two-sided intervals, so
-        # silently switching this one branch to a quantile would make the two disagree.
+        # A one-sided 1-sigma limit means P(x < v) = 68.27% (or P(x > v) = 68.27%), so its
+        # value is the weighted quantile of the SAMPLES.  The contour crossing cannot be
+        # used for it: the sigma/5 smoothing spreads density across a hard prior wall into
+        # bins holding no samples, that leaked mass counts towards the 68.27% inside the
+        # contour, and the crossing then encloses visibly more than 68.27% (71.6% for z1 in
+        # des_only/lfree3/exp, 93.6% for a bimodal z1).  The two-sided HPD branch is
+        # unchanged; the crossings still decide WHICH branch a parameter takes.
+        limit_value = None
+        if limit == 'upper':
+            limit_value = weighted_quantile(v, wv, P_threshold)
+        elif limit == 'lower':
+            limit_value = weighted_quantile(v, wv, 1.0 - P_threshold)
+        # The weighted mass the limit encloses, measured on the samples: 68.27% up to the
+        # quantile interpolation.
         enclosed = float('nan')
         if limit in ('upper', 'lower'):
             wn_all = wv / wv.sum()
-            enclosed = float(np.sum(wn_all[v < hi] if limit == 'upper'
-                                    else wn_all[v > lo]))
+            enclosed = float(np.sum(wn_all[v < limit_value] if limit == 'upper'
+                                    else wn_all[v > limit_value]))
         if limit == 'upper':
             notes.append('ONE-SIDED: the -1sigma crossing (%.6g) falls below the lowest '
                          'sample (%.6g) and bounds nothing -- quote %s < %.6g '
-                         '(nominal %.1f%%, encloses %.1f%% of the samples)'
-                         % (lo, x_min, name, hi, 100.0 * P_threshold, 100.0 * enclosed))
+                         '(the %.2f%% quantile; the +1sigma crossing was %.6g)'
+                         % (lo, x_min, name, limit_value, 100.0 * P_threshold, hi))
         elif limit == 'lower':
             notes.append('ONE-SIDED: the +1sigma crossing (%.6g) falls above the highest '
                          'sample (%.6g) and bounds nothing -- quote %s > %.6g '
-                         '(nominal %.1f%%, encloses %.1f%% of the samples)'
-                         % (hi, x_max, name, lo, 100.0 * P_threshold, 100.0 * enclosed))
+                         '(the %.2f%% quantile; the -1sigma crossing was %.6g)'
+                         % (hi, x_max, name, limit_value, 100.0 * (1.0 - P_threshold), lo))
         elif limit == 'none':
             notes.append('NO LIMIT: the %.1f%% contour clears the sampled range at BOTH '
                          'ends ([%.6g, %.6g]) -- neither crossing bounds anything'

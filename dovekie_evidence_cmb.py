@@ -1,5 +1,5 @@
 """
-dovekie_evidence_cmb.py -- the Table 3 model comparison REPEATED WITH THE CMB.
+dovekie_evidence_cmb.py -- the model comparison WITH THE CMB: the paper's Tables 3 and 4.
 
 The baseline comparison (`dovekie_evidence`) constrains exp, CPL and LCDM with DES-Dovekie,
 DESI DR2 BAO, the cosmic chronometers and a Planck prior on r_d.  CPL was built to fit BAO
@@ -26,7 +26,8 @@ WHAT CHANGES, AND NOTHING ELSE
 
 Everything else -- the SN likelihood with its rank-2 legacy marginalisation, the BAO
 vector, the chronometers, the forward-modelled anchors, and the exp/CPL priors -- is taken
-from `dovekie_evidence` unchanged, so a difference from Table 3 is the CMB and nothing else.
+from `dovekie_evidence` unchanged, so a difference from the CMB-free table is the CMB and
+nothing else.
 
 THE exp MODEL AND THE CMB.  H(z) = H0_LCDM E_LCDM(z) + A exp(-z/z1).  The physical
 densities belong to the LCDM background, omega_bc = Omega_bc h_LCDM^2, because the excess
@@ -529,7 +530,18 @@ def task_cls():
     # name.  Om here is Omega_bc + Omega_nu, 0.0014 above the Omega_bc box -- immaterial
     # to a KL test against a 0.65-wide box.
     _ref = pcs.prior_ref
-    pcs.prior_ref = lambda name, group, cell, summ: _ref(name, 'evidence', cell, summ)
+    # The `__logz1` cells sample z1 log-uniformly on the same range, so their z1 must be
+    # tested against that prior, not the U(z1) box.  r_d is DERIVED from the compressed CMB
+    # in these cells -- no Planck r_d prior is imposed -- so it has no prior to test against.
+    z1_logu = de.Z1_MIN * (de.Z1_MAX / de.Z1_MIN) ** np.random.default_rng(0).random(400000)
+
+    def _cmb_prior_ref(name, group, cell, summ):
+        if name == 'rd':
+            return None
+        if name == 'z1' and cell.endswith('__logz1'):
+            return ('draws', (z1_logu, np.ones_like(z1_logu)))
+        return _ref(name, 'evidence', cell, summ)
+    pcs.prior_ref = _cmb_prior_ref
     recs = []
     d = os.path.join(dc.CHAIN_DIR, TASK)
     for fn in sorted(os.listdir(d)):
@@ -643,7 +655,7 @@ def main(argv=None):
     ap.add_argument('--task', choices=('grid', 'table', 'check', 'cls', 'tex'),
                     default='check')
     ap.add_argument('--baseline', action='store_true',
-                    help='with --task tex: render the CURRENT Table 3 from chains/evidence '
+                    help='with --task tex: render the CMB-free table from chains/evidence '
                          '(a check of the formatting rules; needs the CMB-free evidence chains)')
     ap.add_argument('--only', nargs='*', help='cells as sample/anchor/model')
     ap.add_argument('--recompute', action='store_true')

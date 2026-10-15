@@ -1,8 +1,8 @@
 r"""dh0_ensemble.py -- the null distribution of Delta H0 = H0(DES) - H0(DES+legacy).
 
-THE QUESTION.  The published baseline (Table 1, configuration A, cosmography P=4) returns
-H0 = 76.83 +- 2.88 from DES alone and 68.02 +- 0.70 once the legacy supernovae are added:
-a shift of Delta H0 = 8.81 km/s/Mpc.  How often does an ensemble of CMB-calibrated flat
+THE QUESTION.  The published baseline (Table 2, configuration A, cosmography P=4) returns
+H0 = 76.25 +- 2.87 from DES alone and 67.98 +- 0.69 once the legacy supernovae are added:
+a shift of Delta H0 = 8.27 km/s/Mpc.  How often does an ensemble of CMB-calibrated flat
 LCDM realisations -- in which the legacy supernovae are perfectly calibrated and there is
 no late-time physics at all -- produce a shift that large or larger?
 
@@ -16,10 +16,10 @@ realisation index only, so realisation N here is the SAME universe as realisatio
 floor-sweep ensemble in results_mock/lsweep_realN.json.
 
 THE ESTIMATOR IS LEAST SQUARES, NOT NUTS, AND THAT IS WHY THE OBSERVED VALUE IS REFIT.
-An ensemble of 300 x 2 NUTS cells is not affordable, so the prior-free chi2 minimum with
+An ensemble of 10^4 x 2 NUTS cells is not affordable, so the prior-free chi2 minimum with
 Gauss-Newton errors is used, exactly as in the floor-sweep null test.  The observed value
 is therefore recomputed through THIS estimator (--real -1) and the p-value is quoted
-against that, like for like; the published 8.81 is carried alongside as the number the
+against that, like for like; the published 8.27 is carried alongside as the number the
 manuscript quotes, and the two are reported together so any estimator gap is visible
 rather than assumed away.
 
@@ -77,6 +77,7 @@ def run(reals, fiducial='lcdm', delta=0.0, quiet=True):
             continue
         dc.CHAIN_DIR = mi._chain_dir(tag)
         if real < 0:
+            mi.uninstall_mock(dc)
             print('\n=== REAL DATA (no mock installed)')
         else:
             mock = mi.build_mock(dc, real, delta=delta, fid=fid)

@@ -1,8 +1,8 @@
 r"""mock_idl.py -- the NULL TEST behind the redshift-floor sweep.
 
 THE QUESTION.  The floor sweep (`fig:floorsweep-real-new` in the paper) shows the DES+legacy
-$H_0$ climbing monotonically from 67.85 at $z_{\rm floor}=0.030$ to 76.48 at 0.090 -- a
-9 km/s/Mpc trend -- while DES alone sits flat and high.  Is a trend of that size a FEATURE
+$H_0$ climbing monotonically from 67.8 at $z_{\rm floor}=0.030$ to 75.7 at 0.090 -- an
+8 km/s/Mpc trend -- while DES alone sits flat and high.  Is a trend of that size a FEATURE
 of the data, or is it what this estimator would return even if the Universe were exactly
 the CMB-calibrated flat LCDM and the legacy supernovae were perfectly calibrated?
 
@@ -138,6 +138,20 @@ def _mvn_draw(cov, rng, jitter=1e-9):
     return L @ rng.standard_normal(n)
 
 
+# The REAL data readers, captured once, before the first mock replaces them.  Every mock
+# is built from and wraps THESE, never the previously installed mock: wrapping the current
+# `dc.bao_vector` nested one closure per install, which overflowed the recursion limit after
+# ~1000 realisations in one process.  uninstall_mock puts them back.
+_REAL_READERS = {}
+
+
+def _real_readers(dc):
+    if not _REAL_READERS:
+        _REAL_READERS.update(read_hubble_diagram=dc.read_hubble_diagram,
+                             bao_vector=dc.bao_vector, cc_block=dc.cc_block)
+    return _REAL_READERS
+
+
 def build_mock(dc, real, delta=0.0, fid=None):
     """Return the mock data vectors, WITHOUT installing them.
 
@@ -145,20 +159,21 @@ def build_mock(dc, real, delta=0.0, fid=None):
     """
     fid = dict(FID if fid is None else fid)
     rng = np.random.default_rng(20260825 + 1000 * int(real))
+    rr = _real_readers(dc)
 
     # --- the canonical z-grid --------------------------------------------------------
     # build_blocks makes zgrid = linspace(0, zmax + 1e-6, NGRID) with
     # zmax = max(BAO z, SN z, CC z).  The Lyman-alpha BAO point at z = 2.33 dominates both
     # samples and every floor (the floors cut the LOW end only), so ONE grid serves the
     # whole sweep and the mock is generated on precisely the grid the likelihood integrates.
-    _O, _C, zs_b, kinds_b = dc.bao_vector()
+    _O, _C, zs_b, kinds_b = rr['bao_vector']()
     z_uni = np.unique(zs_b)
     zmax = max(float(z_uni.max()), float(dc.sn_dataset('full')['z'].max()))
     zgrid = np.linspace(0.0, zmax + 1e-6, dc.BASELINE['NGRID'])
     Hg = fiducial_Hg(dc, zgrid, fid)
 
     # --- supernovae ------------------------------------------------------------------
-    cid, ids, z, zhel, mu, muerr = dc.read_hubble_diagram()
+    cid, ids, z, zhel, mu, muerr = rr['read_hubble_diagram']()
     cov_all = dc.read_covariance()
     keep = muerr < dc.BASELINE['CLEAN_MUERR_MAX']
     cov = 0.5 * (cov_all[np.ix_(keep, keep)] + cov_all[np.ix_(keep, keep)].T)
@@ -189,7 +204,7 @@ def build_mock(dc, real, delta=0.0, fid=None):
     # --- cosmic chronometers ---------------------------------------------------------
     # Not used by configuration A (the sweep), but mocked so configuration B is available
     # from the same realisation rather than being half real and half simulated.
-    z_cc, H_cc, C_cc = dc.cc_block()
+    z_cc, H_cc, C_cc = rr['cc_block']()
     H_cc_true = dc.H_poly(z_cc, dc.lcdm_coeffs(fid['Om'], fid['H0'],
                                                       dc.BASELINE['P'])) \
         if fid.get('background', 'lcdm') == 'cosmo' \
@@ -223,7 +238,7 @@ def install_mock(dc, mock):
     with no arguments it would not receive on the real data."""
     cid, ids, z, zhel, mu, muerr = (mock['cid'], mock['ids'], mock['z'],
                                     mock['zhel'], mock['mu'], mock['muerr'])
-    real_bao = dc.bao_vector
+    real_bao = _real_readers(dc)['bao_vector']
     by_key = mock['bao_by_key']
     z_cc, H_cc, C_cc = mock['cc']
 
@@ -244,6 +259,15 @@ def install_mock(dc, mock):
     dc.read_hubble_diagram = mock_hd
     dc.bao_vector = mock_bao
     dc.cc_block = mock_cc
+    dc._SN_CACHE.clear()
+    return dc
+
+
+def uninstall_mock(dc):
+    """Restore the real data readers and clear the cache, so a real-data run that follows a
+    mock in the same process fits the observed catalogue and not the last mock."""
+    for name, fn in _real_readers(dc).items():
+        setattr(dc, name, fn)
     dc._SN_CACHE.clear()
     return dc
 
@@ -419,7 +443,7 @@ def task_lsweep(dc, tag, quiet=True):
     # dc.floorsweep_grid() verbatim, plus ONE cell it cannot contain: des_only at
     # z_floor = 0.073.  The grid drops it because the DES minimum is 0.0733, so the cut is
     # a no-op there -- but the paper's headline sweep statistic is exactly the contrast
-    # "at z_floor = 0.073, adding the 10 surviving legacy SNe moves H0 by 4.78", and that
+    # "at z_floor = 0.073, adding the 10 surviving legacy SNe moves H0 by 4.45", and that
     # needs the DES-only fit at the SAME floor to subtract.  It costs one extra cell.
     grid = list(dc.floorsweep_grid())
     if ('des_only', 0.073, False) not in grid:
@@ -630,6 +654,7 @@ def main(argv=None):
             # error convention.  The published NUTS numbers are then a separate check that
             # the estimator agrees with the posterior, which --task baseline makes.
             mock = None
+            uninstall_mock(dc)
             print('\n=== REAL DATA (no mock installed)')
         else:
             mock = build_mock(dc, real, delta=a.delta, fid=fid)

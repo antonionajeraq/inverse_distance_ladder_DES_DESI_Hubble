@@ -1069,6 +1069,58 @@ def test_no_output_script_raw_loads_a_chain():
                                      % (fn, node.lineno, seg[:100]))
 
 
+@test
+def test_repeated_mock_installs_do_not_nest_and_uninstall_restores_the_data():
+    """install_mock wrapped whatever `dc.bao_vector` currently was, so each install nested
+    one more closure: a 10^4-realisation run in one process hit RecursionError, and a
+    real-data run after a mock silently fitted the mock."""
+    import dovekie_cosmography as dc
+    import mock_idl as mi
+    mu_real = np.array(dc.read_hubble_diagram()[4], float)
+    O_real = np.array(dc.bao_vector()[0], float)
+    try:
+        mock = mi.build_mock(dc, 1)
+        for _ in range(3000):
+            mi.install_mock(dc, mock)
+        O, _C, zs, kinds = dc.bao_vector()
+        want = [mock['bao_by_key'][(float(z), str(k))] for z, k in zip(zs, kinds)]
+        close(O, want, 0.0, 'BAO served after 3000 installs')
+    finally:
+        mi.uninstall_mock(dc)
+    if not np.array_equal(np.array(dc.read_hubble_diagram()[4], float), mu_real):
+        raise AssertionError('uninstall_mock did not restore the real Hubble diagram')
+    if not np.array_equal(np.array(dc.bao_vector()[0], float), O_real):
+        raise AssertionError('uninstall_mock did not restore the real BAO vector')
+
+
+@test
+def test_a_one_sided_limit_encloses_its_nominal_mass():
+    """The one-sided limit was the HPD contour crossing, which the density smoothing pushes
+    outwards against a hard prior wall: z1 < 0.109 enclosed 71.6% of the samples rather than
+    68.27%.  It is now the weighted quantile."""
+    import tempfile
+    import print_cls_sigma as pcs
+    rng = np.random.default_rng(1)
+    x = rng.exponential(0.05, 200000)
+    x = x[x < 0.5] + 0.001                      # piles up against a wall at 0.001
+    w = np.ones_like(x)
+    saved = (pcs.load_validated, pcs.read_chain, pcs.prior_ref)
+    try:
+        pcs.load_validated = lambda group, path: {}
+        pcs.read_chain = lambda path, d: ([('z1', x)], w, 'synthetic')
+        pcs.prior_ref = lambda name, group, cell, summ: None
+        with tempfile.TemporaryDirectory() as tmp:
+            res = pcs.analyse_chain(os.path.join(tmp, 'synthetic.npz'), 'synthetic')
+    finally:
+        pcs.load_validated, pcs.read_chain, pcs.prior_ref = saved
+    rec = [r for r in res[1] if r['param'] == 'z1'][0]
+    if rec['limit'] != 'upper':
+        raise AssertionError('a posterior against its lower wall is not read as an upper '
+                             'limit (got %r)' % rec['limit'])
+    close(np.mean(x < rec['limit_value']), pcs.P_threshold, 2e-3,
+          'mass below the one-sided limit')
+
+
 def main(argv=None):
     keyword = None
     argv = argv if argv is not None else sys.argv[1:]

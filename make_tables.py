@@ -374,8 +374,14 @@ def table5():
     rows.append((None, r'$H_0$',
                  r'$\mathcal{U}(%.0f,\,%.0f)\kmsMpc$' % (B['H0_LO'], B['H0_HI']), ''))
 
-    rows.append((r'Model comparison (Table~\ref{tab:evidence})', None, None, None))
-    rows.append((None, r'$\Omega_{\rm m}$',
+    # The model comparison samples (omega_b, Omega_bc, H0, ...) and derives r_d from the
+    # compressed CMB (dovekie_evidence_cmb.make_ptform); there is no r_d or Omega_m prior.
+    import dovekie_evidence_cmb as dec
+    rows.append((r'Model comparison (Tables~\ref{tab:evidence} and \ref{tab:logz1})',
+                 None, None, None))
+    rows.append((None, r'$\omega_{\rm b}$',
+                 r'$\mathcal{U}(%.3f,\,%.3f)$' % (dec.WB_LO, dec.WB_HI), ''))
+    rows.append((None, r'$\Omega_{\rm bc}$',
                  r'$\mathcal{U}(%.2f,\,%.2f)$' % (de.OM_LO, de.OM_HI), ''))
     rows.append((None, r'$H_0$',
                  r'$\mathcal{U}(%.0f,\,%.0f)\kmsMpc$' % (de.H0_LO, de.H0_HI),
@@ -385,13 +391,11 @@ def table5():
                  r'two-sided by construction'))
     rows.append((None, r'$z_1$',
                  r'$\mathcal{U}(%.3f,\,%.2f)$' % (de.Z1_MIN, de.Z1_MAX),
-                 r'lower edge is a numerical floor'))
+                 r'or log-uniform on the same range (Table~\ref{tab:logz1})'))
     rows.append((None, r'$w_0$',
                  r'$\mathcal{U}(%.0f,\,%.0f)$' % (de.W0_LO, de.W0_HI), ''))
     rows.append((None, r'$w_a$',
                  r'$\mathcal{U}(%.0f,\,%.0f)$' % (de.WA_LO, de.WA_HI), ''))
-    rows.append((None, r'$r_d$',
-                 r'$\mathcal{N}(%.2f,\,%.2f)$~cMpc' % (B['RD_PLANCK'], B['SIG_RD']), ''))
 
     L = [r'% Table 5 -- built by make_tables.py from dovekie_cosmography.BASELINE',
          r'%              and dovekie_evidence, i.e. from the code that imposes them.',
